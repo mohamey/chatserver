@@ -41,10 +41,19 @@ def chatroomExists(name):
     return False
 
 # Get room by name
-def getRoomIndex(name):
+def getRoomByName(name):
     index = 0
     for chatroom in chatrooms:
         if chatroom['Name'] == name:
+            return index
+        else:
+            index += 1
+    return -1
+
+def getRoomById(ID):
+    index = 0
+    for chatroom in chatrooms:
+        if chatroom['ID'] == ID:
             return index
         else:
             index += 1
@@ -117,6 +126,7 @@ def spawnRoom(sock, name):
             detail = line.split(':')[1]
             details.push[detail]
 
+
 # If server is main thread, initialise it
 if __name__ == '__main__':
     workers = Pool(10)
@@ -135,7 +145,7 @@ if __name__ == '__main__':
         except socket.error as msg:
             print(str(msg[1]))
             sys.exit()
-        
+
         # Create process for main chatroom
         chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         chatSocket.bind(('0.0.0.0', 0))
@@ -166,9 +176,9 @@ if __name__ == '__main__':
 
                 details = []
                 for line in message_lines:
-                    detail = line.split(':')
-                    print(detail[1])
-                    details.append(detail[1].strip())
+                    if line:
+                        detail = line.split(':')
+                        details.append(detail[1].strip())
 
                 # Details = chatroom name, client ip, client port, client name
                 # If chatroom doesn't exist, create it
@@ -184,7 +194,7 @@ if __name__ == '__main__':
                     workers.apply_async(spawnRoom, [chatSocket, details[0]])
 
                 # Send back response to client containing room details
-                chatroom = chatrooms[getRoomIndex(roomName)]
+                chatroom = chatrooms[getRoomByName(roomName)]
                 response = 'JOINED_CHATROOM: {}\n'.format(roomName)
                 response += 'SERVER_IP: {}\n'.format(chatroom['IP'])
                 response += 'PORT: {}\n'.format(chatroom['Port'])
@@ -196,7 +206,7 @@ if __name__ == '__main__':
 
                 # Add new member to list of chatroom members
                 chatroom['Members'].append(str(joinId))
-                
+
                 # Add client to clients list
                 client = {
                     'JoinId': str(joinId),
@@ -205,14 +215,25 @@ if __name__ == '__main__':
                     'Port': client_port
                 }
                 clients.append(client)
+                joinId += 1
                 print("Updated client and room details")
             elif message.startswith('LEAVE_CHATROOM'):
+                print("Request to leave received")
                 # Parse message
                 message_lines = message.split('\n')
 
                 details = []
                 for line in message_lines:
-                    detail = line.split(':')
-                    details.append(detail[1].strip())
+                    if line:
+                        detail = line.split(':')[1]
+                        details.append(detail.strip())
 
-                chatrooms[getRoomIndex()]
+                # Get chatroom from ID, remove client from member list
+                chatrooms[getRoomById(details[0])]['Members'].remove(details[1])
+
+                # Send back the response
+                response = "LEFT_CHATROOM: {}\n".format(details[0])
+                response += "JOIN_ID: {}\n".format(details[1])
+
+                conn.send(response.encode())
+                conn.close()

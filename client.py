@@ -1,4 +1,5 @@
 import socket
+from time import sleep
 from sys import argv, exit
 
 HOST = ''
@@ -24,6 +25,7 @@ if '-m' in argv:
     clientMessage = str(argv[pos+1]) +"\n"
 else:
     clientMessage = 'JOIN_CHATROOM: temp\nCLIENT_IP: 0\nPORT: 0\nCLIENT_NAME: nick'
+
 
 try:
     # Connect to the server
@@ -53,8 +55,39 @@ while True:
 # Print the result
 print(data.decode("utf-8"))
 
-# Kill Server
-sock.send('KILL_SERVICE\n'.encode())
+# Leave the chatroom
+message = "LEAVE_CHATROOM: 1\nJOIN_ID: 0\nCLIENT_NAME: nick\n"
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+try:
+    # Connect to the server
+    sock.connect((HOST, PORT))
+except socket.error as msg:
+    print(str(msg[1]))
+    exit()
+
+sock.send(message.encode())
+
+# Initialise variables for receiving data
+data = b''
+
+# Loop until no more data is received
+while True:
+    print("Waiting")
+    new_data = sock.recv(1024)
+
+    # Exit loop if nothing is received
+    if not new_data: break
+
+    data += new_data
+
+    if data.decode().endswith('\n'):
+        break
+
+# Print the result
+print(data.decode("utf-8"))
 
 # Close the socket
 sock.close()
