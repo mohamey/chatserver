@@ -23,7 +23,7 @@ if '-m' in argv:
     pos = argv.index('-m')
     clientMessage = str(argv[pos+1]) +"\n"
 else:
-    clientMessage = 'JOIN_CHATROOM: main\nCLIENT_IP: 0\nPORT: 0\nCLIENT_NAME: nick'
+    clientMessage = 'JOIN_CHATROOM: temp\nCLIENT_IP: 0\nPORT: 0\nCLIENT_NAME: nick'
 
 try:
     # Connect to the server
