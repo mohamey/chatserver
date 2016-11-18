@@ -21,6 +21,8 @@ chatrooms = [
 # Client List
 clients = []
 
+joinId = 0
+
 def createChatroom(name, IP, Port):
     newRoom = {
         'Name': name,
@@ -94,6 +96,7 @@ def spawnRoom(sock, name):
     print("Started chatroom {}".format(name))
     # Start listening for connections
     sock.listen(5)
+    print("Listening on {}".format(sock.getsockname()))
 
     # Wait and listen for client connections
     while True:
@@ -104,7 +107,7 @@ def spawnRoom(sock, name):
         data = listen(conn)
 
         message = data.decode('utf-8')
-        print(message)
+        print('{}: {}'.format(name, message))
         conn.close()
 
         # Parse message
@@ -155,34 +158,61 @@ if __name__ == '__main__':
 
             message = data.decode('utf-8')
 
-            # Parse message
-            message_lines = message.split('\n')
-            details = []
-            for line in message_lines:
-                detail = line.split(':')
-                print(detail[1])
-                details.append(detail[1].strip())
+            if message.startswith('JOIN_CHATROOM'):
+                client_ip = addr[0]
+                client_port = addr[1]
+                # Parse message
+                message_lines = message.split('\n')
 
-            # Details = chatroom name, client ip, client port, client name
-            # If chatroom doesn't exist, create it
-            roomName = details[0].strip()
-            if not chatroomExists(roomName):
-                chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                chatSocket.bind(('0.0.0.0', 0))
-                chatPort = chatSocket.getsockname()[1]
-                print("Creating Chatroom {}".format(roomName))
-                createChatroom(roomName, IP_ADDRESS, chatPort)
+                details = []
+                for line in message_lines:
+                    detail = line.split(':')
+                    print(detail[1])
+                    details.append(detail[1].strip())
 
-                # Assign the chat room to a worker thread
-                workers.apply_async(spawnRoom, [chatSocket, details[0]])
+                # Details = chatroom name, client ip, client port, client name
+                # If chatroom doesn't exist, create it
+                roomName = details[0].strip()
+                if not chatroomExists(roomName):
+                    chatSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    chatSocket.bind(('', 0))
+                    chatPort = chatSocket.getsockname()[1]
+                    print("Creating Chatroom {}".format(roomName))
+                    createChatroom(roomName, IP_ADDRESS, chatPort)
 
-            # Send back response to client containing room details
-            chatroom = chatrooms[getRoomIndex(roomName)]
-            response = 'JOINED_CHATROOM: {}\n'.format(roomName)
-            response += 'SERVER_IP: {}\n'.format(chatroom['IP'])
-            response += 'PORT: {}\n'.format(chatroom['Port'])
-            response += 'ROOM_REF: {}\n'.format(chatroom['ID'])
-            response += 'JOIN_ID: 1\n'
+                    # Assign the chat room to a worker thread
+                    workers.apply_async(spawnRoom, [chatSocket, details[0]])
 
-            conn.sendall(response.encode())
-            conn.close()
+                # Send back response to client containing room details
+                chatroom = chatrooms[getRoomIndex(roomName)]
+                response = 'JOINED_CHATROOM: {}\n'.format(roomName)
+                response += 'SERVER_IP: {}\n'.format(chatroom['IP'])
+                response += 'PORT: {}\n'.format(chatroom['Port'])
+                response += 'ROOM_REF: {}\n'.format(chatroom['ID'])
+                response += 'JOIN_ID: {}\n'.format(str(joinId))
+
+                conn.send(response.encode())
+                conn.close()
+
+                # Add new member to list of chatroom members
+                chatroom['Members'].append(str(joinId))
+                
+                # Add client to clients list
+                client = {
+                    'JoinId': str(joinId),
+                    'Name': details[3],
+                    'IP': client_ip,
+                    'Port': client_port
+                }
+                clients.append(client)
+                print("Updated client and room details")
+            elif message.startswith('LEAVE_CHATROOM'):
+                # Parse message
+                message_lines = message.split('\n')
+
+                details = []
+                for line in message_lines:
+                    detail = line.split(':')
+                    details.append(detail[1].strip())
+
+                chatrooms[getRoomIndex()]
