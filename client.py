@@ -56,7 +56,7 @@ while True:
 print(data.decode("utf-8"))
 
 # Leave the chatroom
-message = "LEAVE_CHATROOM: 1\nJOIN_ID: 0\nCLIENT_NAME: nick\n"
+message = "DISCONNECT: 0\nPORT: 0\nCLIENT_NAME: nick\n"
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

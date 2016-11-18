@@ -59,6 +59,16 @@ def getRoomById(ID):
             index += 1
     return -1
 
+def getClientByName(name):
+    index = 0
+    for client in clients:
+        if client['Name'] == name:
+            return index
+        else:
+            index += 1
+
+    return index
+
 # Handle the incoming messages from the client
 def handleMessage(conn, addr, msg):
     msg = msg.strip()
@@ -168,17 +178,18 @@ if __name__ == '__main__':
 
             message = data.decode('utf-8')
 
+            # Parse message
+            message_lines = message.split('\n')
+
+            details = []
+            for line in message_lines:
+                if line:
+                    detail = line.split(':')[1]
+                    details.append(detail.strip())
+
             if message.startswith('JOIN_CHATROOM'):
                 client_ip = addr[0]
                 client_port = addr[1]
-                # Parse message
-                message_lines = message.split('\n')
-
-                details = []
-                for line in message_lines:
-                    if line:
-                        detail = line.split(':')
-                        details.append(detail[1].strip())
 
                 # Details = chatroom name, client ip, client port, client name
                 # If chatroom doesn't exist, create it
@@ -219,14 +230,6 @@ if __name__ == '__main__':
                 print("Updated client and room details")
             elif message.startswith('LEAVE_CHATROOM'):
                 print("Request to leave received")
-                # Parse message
-                message_lines = message.split('\n')
-
-                details = []
-                for line in message_lines:
-                    if line:
-                        detail = line.split(':')[1]
-                        details.append(detail.strip())
 
                 # Get chatroom from ID, remove client from member list
                 chatrooms[getRoomById(details[0])]['Members'].remove(details[1])
@@ -237,3 +240,13 @@ if __name__ == '__main__':
 
                 conn.send(response.encode())
                 conn.close()
+            elif message.startswith('DISCONNECT'):
+                print("Request to disconnect received")
+                index = getClientByName(details[2])
+                if index != -1:
+                    conn.close()
+                    del clients[index]
+                    print("Client deleted")
+                else:
+                    print("Client not found")
+
