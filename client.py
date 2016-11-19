@@ -38,23 +38,27 @@ def listen(conn, timeout=2, blocking=False):
 def listenForServer(portNo):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serverSock:
         serverSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        serverSock.bind(('0.0.0.0', portNo))
+
+        try:
+            serverSock.bind(('0.0.0.0', portNo))
+        except socket.error as msg:
+            print(str(msg[1]))
         serverSock.listen(10)
         while True:
             con, addr = serverSock.accept()
             data = listen(con)
             if data:
                 print(data.decode('utf-8'))
+                print('Please enter a command:\n')
             data = b''
 
-def sendMessage(room, message):
+def sendMessage(room, name, message):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         destination = (room['IP'], int(room['Port']))
         sock.connect(destination)
         roomId = room['ID']
         joinId = room['JoinId']
-        name = room['Name']
         msg = "CHAT: {}\nJOIN_ID: {}\nCLIENT_NAME: {}\nMESSAGE: {}\n\n".format(roomId, joinId, name, message)
         msg_bytes = msg.encode()
         sock.send(msg_bytes)
@@ -105,7 +109,7 @@ def joinRoom(destination, chatroom, name):
     for line in message_lines:
         if line:
             detail = line.split(':')[1]
-            details.append(detail)
+            details.append(detail.strip())
 
     # If successful
     if message.startswith('JOINED_CHATROOM'):
@@ -114,13 +118,14 @@ def joinRoom(destination, chatroom, name):
             'Name': details[0].strip(),
             'JoinId': details[4].strip(),
             'IP': details[1].strip(),
-            'Port': details[2].strip()
+            'Port': details[2].strip(),
         }
         rooms.append(room)
 
         # Hand off original socket to background thread
         # This will listen for messages from the server
         port = sock.getsockname()
+        sock.close()
         return port
 
 if __name__ == '__main__':
@@ -155,7 +160,7 @@ if __name__ == '__main__':
     mainServer = (HOST, PORT)
 
     while True:
-        user_command = input('Please enter a command:\n')
+        user_command = input("Please enter a command:\n")
         cmd_parts = user_command.split(' ')
 
         if cmd_parts[0].lower() == "send":
@@ -163,15 +168,22 @@ if __name__ == '__main__':
             roomIndex = getRoomByName(roomName)
             if roomIndex != -1:
                 room = rooms[roomIndex]
-                message = ' '.join(cmd_parts[1:])
-                sendMessage(room, message)
+                message = ' '.join(cmd_parts[2:])
+                sendMessage(room, name, message)
         elif cmd_parts[0].lower() == "leave_chatroom":
             # Get room details
-            roomIndex = getRoomByName(details[1])
-            if room == -1:
+            roomIndex = getRoomByName(cmd_parts[1])
+            if roomIndex == -1:
                 print("Room not found")
             else:
                 leaveRoom(rooms[roomIndex], mainServer)
         elif cmd_parts[0].lower() == "join":
             port = joinRoom(mainServer, cmd_parts[1], name)
-            workers.apply_async(listenForServer, [port])
+            workers.apply_async(listenForServer, [port[1]])
+        elif cmd_parts[0].lower() == "disconnect":
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as dissock:
+                dissock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                dissock.connect(mainServer)
+                msg = "DISCONNECT: 0\nPORT: 0\nCLIENT_NAME: {}\n".format(name)
+                msg_bytes = msg.encode()
+                dissock.send(msg_bytes)
