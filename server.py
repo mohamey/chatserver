@@ -70,6 +70,16 @@ def getClientsInRoom(joinIds):
 
     return results
 
+def getMemberById(members, joinId):
+    index = 0
+    for member in members:
+        if member['JoinId'] == joinId:
+            return index
+        else:
+            index += 1
+
+    return -1
+
 # Listen for message from client
 def listen(conn, timeout=2, blocking=False):
     data = b''
@@ -149,7 +159,6 @@ def spawnRoom(sock, name, chatrooms, clients):
             for member in chatroom['Members']:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as memSock:
                     memSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sleep(2)
                     print("Sending message to member")
                     print(member['IP'])
                     print(int(member['Port']))
@@ -263,7 +272,6 @@ if __name__ == '__main__':
                     client['IP'] = addr[0]
                     client['Port'] = addr[1]
                     clients.append(client)
-                    joinId += 1
                     print("Server Updated client and room details")
 
                     # Send back response to client containing room details
@@ -276,11 +284,27 @@ if __name__ == '__main__':
                     conn.send(response.encode())
                     conn.close()
 
+                    joinId += 1
+
                 elif message.startswith('LEAVE_CHATROOM'):
                     print("Request to leave received")
 
                     # Get chatroom from ID, remove client from member list
-                    chatrooms[getRoomById(details[0])]['Members'].remove(details[1])
+                    roomIndex = getRoomById(details[0])
+                    chatroom = chatrooms[roomIndex]
+                    # Remove member by id
+                    memberIndex = getMemberById(chatroom['Members'], details[1])
+                    if memberIndex != -1:
+                        del chatroom['Members'][memberIndex]
+                    else:
+                        print(details[1])
+                        for member in chatroom['Members']:
+                            for key in member:
+                                print("{}: {}".format(key, member[key]))
+                            print("\n")
+                        print("MEMBER NOT FOUND")
+
+                    chatrooms[roomIndex] = chatroom
 
                     # Send back the response
                     response = "LEFT_CHATROOM: {}\n".format(details[0])
