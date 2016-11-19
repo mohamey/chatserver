@@ -11,7 +11,7 @@ IP_ADDRESS = '0.0.0.0'
 manager = Manager()
 
 # Chatrooms
-chatrooms =[
+chatrooms = manager.list([
     {
         'Name': 'main',
         'ID': 0,
@@ -20,7 +20,9 @@ chatrooms =[
         'Members': [],
         'Messages': []
     }
-]
+])
+
+# chatrooms = manager.list()
 
 # Client List
 clients = manager.list()
@@ -114,13 +116,13 @@ def spawnRoom(sock, name, chatrooms, clients):
     print("Room Listening on {}".format(sock.getsockname()))
     cindex = getRoomByName(name)
     if cindex == -1:
-        print('ROOM NOT FOUND')
-    else:
-        print('ROOM FOUND')
+        print("Room {} could not be found".format(name))
+        sys.exit()
 
     # Wait and listen for client connections
     while True:
         # Make a blocking call to wait for connections
+        print("Room {} Listening for connection...".format(name))
         conn, addr = sock.accept()
         print('Room Connected with {}:{}'.format(addr[0], str(addr[1])))
 
@@ -146,11 +148,12 @@ def spawnRoom(sock, name, chatrooms, clients):
                 'Message': details[3]
             }
             chatrooms[cindex]['Messages'].append(message_object)
+            for key in chatrooms[cindex]:
+                print("{}: {}".format(key, chatrooms[cindex][key]))
 
             # Gather IP and Ports of current room members
             currentMembers = getClientsInRoom(chatrooms[cindex]['Members'])
-            for key in chatrooms[cindex]:
-                print("{}:{}".format(key, chatrooms[cindex][key]))
+            print('CURRENT MEMBERS: {}'.format(str(len(currentMembers))))
 
             # Create message object to send to members
             msg = "CHAT: {}\n".format(details[0])
@@ -158,8 +161,6 @@ def spawnRoom(sock, name, chatrooms, clients):
             msg += "MESSAGE: {}\n".format(details[3])
             msg_bytes = msg.encode()
 
-            print("LENGTH CLIENTS: {}".format(len(clients)))
-            print(len(currentMembers))
             # Send message to all chat room users
             for member in currentMembers:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as memSock:
@@ -167,18 +168,6 @@ def spawnRoom(sock, name, chatrooms, clients):
                     memSock.bind(member)
                     memSock.send(msg_bytes)
                     print("Sent message to member")
-        elif message.startswith('MEMBER'):
-            member_object = {
-                'Name': details[0],
-                'JoinId': details[1],
-                'IP': details[2],
-                'Port': details[3]
-            }
-
-            chatrooms[cindex]['Members'].append(member_object)
-            print("Added member in chat thread")
-            print(str(len(chatrooms[cindex]['Members'])))
-
 
 
 # If server is main thread, initialise it
@@ -250,45 +239,21 @@ if __name__ == '__main__':
                     workers.apply_async(spawnRoom, [chatSocket, details[0], chatrooms, clients])
 
                 # Add new member to list of chatroom members
-                member_object = {
-                    'JoinId': str(joinId),
-                    'Name': details[3],
-                    'IP': details[1],
-                    'Port': details[2]
-                }
                 roomIndex = getRoomByName(roomName)
                 chatroom = chatrooms[roomIndex]
-                chatroom['Members'].append(member_object)
-                print('LENGTH: {}'.format(str(len(chatroom['Members']))))
-                for key in chatrooms[roomIndex]:
-                    print('KEY: {}'.format(key))
-
-                
-                # Send message to room with the new clients details
-                # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as roomSock:
-                #     print(chatroom['Port'])
-                #     roomSock.connect((chatroom['IP'], int(chatroom['Port'])))
-                #     msgString = "MEMBER: {}".format(details[3])
-                #     msgString += "JOIN_ID: {}\n".format(str(joinId))
-                #     msgString += "IP: {}\n".format(details[1])
-                #     msgString += "PORT: {}\n".format(details[2])
-                #     print(msgString)
-                #     roomSock.send(msgString.encode())
-
+                chatroom['Members'].append(str(joinId))
 
                 # Add client to clients list
                 client = {
                     'JoinId': str(joinId),
                     'Name': details[3],
-                    'IP': client_ip,
-                    'Port': client_port
+                    'IP': addr[0],
+                    'Port': addr[1]
                 }
                 clients.append(client)
-                print(len(clients))
                 joinId += 1
-                print("Updated client and room details")
+                print("Server Updated client and room details")
 
-                chatroom = chatrooms[getRoomByName(roomName)]
                 # Send back response to client containing room details
                 response = 'JOINED_CHATROOM: {}\n'.format(roomName)
                 response += 'SERVER_IP: {}\n'.format(chatroom['IP'])
@@ -298,6 +263,7 @@ if __name__ == '__main__':
 
                 conn.send(response.encode())
                 conn.close()
+
             elif message.startswith('LEAVE_CHATROOM'):
                 print("Request to leave received")
 
@@ -310,6 +276,7 @@ if __name__ == '__main__':
 
                 conn.send(response.encode())
                 conn.close()
+
             elif message.startswith('DISCONNECT'):
                 print("Request to disconnect received")
                 index = getClientByName(details[2])
