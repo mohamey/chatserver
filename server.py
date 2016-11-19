@@ -3,7 +3,7 @@ import sys
 import os
 from _thread import interrupt_main
 from multiprocessing import Pool, Manager
-from time import time
+from time import time, sleep
 
 IP_ADDRESS = '0.0.0.0'
 
@@ -143,14 +143,19 @@ def spawnRoom(sock, name, chatrooms, clients):
             msg += "MESSAGE: {}\n".format(details[3])
             msg_bytes = msg.encode()
 
+            chatroom = chatrooms[cindex]
+            print(str(len(chatroom['Members'])))
             # Send message to all chat room users
-            for member in chatrooms[cindex]['Members']:
+            for member in chatroom['Members']:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as memSock:
+                    memSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sleep(2)
                     print("Sending message to member")
                     print(member['IP'])
                     print(int(member['Port']))
-                    # memSock.connect((member['IP'], int(member['Port'])))
-                    # memSock.send(msg_bytes)
+                    print(msg)
+                    memSock.connect(('0.0.0.0', int(member['Port'])))
+                    memSock.send(msg_bytes)
                     print("Sent message to member")
 
 

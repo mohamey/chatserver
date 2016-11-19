@@ -5,18 +5,22 @@ from multiprocessing import Pool
 
 rooms = []
 
-def listen(conn, timeout=2):
-    # Initialise variables for receiving data
+def listen(conn, timeout=2, blocking=False):
     data = b''
-
-    # Loop until no more data is received
+    if blocking:
+        conn.setblocking(0)
     while True:
-        new_data = sock.recv(1024)
+        new_data = b''
+        try:
+            new_data = conn.recv(1024)
+        except:
+            pass
 
-        # Exit loop if nothing is received
-        if not new_data: break
-
-        data += new_data
+        # If nothing is received, exit the loop
+        if not new_data:
+            break
+        else:
+            data += new_data
 
     return data
 
@@ -98,8 +102,8 @@ if __name__ == '__main__':
 
         # Hand off original socket to background thread
         # This will listen for messages from the server
-        workers = Pool(1)
-        workers.apply_async(listenForServer, [sock])
+        # workers = Pool(1)
+        # workers.apply_async(listenForServer, [sock])
 
         # Command line prompt to communicate with server
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as comSock:
@@ -113,3 +117,17 @@ if __name__ == '__main__':
             msgString += "MESSAGE: Testing\n\n"
             # print(msgString)
             comSock.send(msgString.encode())
+
+        port = sock.getsockname()
+        print(str(port[1]))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serverSock:
+            serverSock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            serverSock.bind(('0.0.0.0', port[1]))
+            serverSock.listen(10)
+            while True:
+                con, addr = serverSock.accept()
+                data = listen(con)
+                if data:
+                    print(data.decode('utf-8'))
+                data = b''
+
