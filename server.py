@@ -147,11 +147,10 @@ def spawnRoom(sock, name, chatrooms, clients):
             for member in chatrooms[cindex]['Members']:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as memSock:
                     print("Sending message to member")
-                    print(str(len(clients)))
                     print(member['IP'])
                     print(int(member['Port']))
-                    memSock.connect((member['IP'], int(member['Port'])))
-                    memSock.send(msg_bytes)
+                    # memSock.connect((member['IP'], int(member['Port'])))
+                    # memSock.send(msg_bytes)
                     print("Sent message to member")
 
 
@@ -242,7 +241,13 @@ if __name__ == '__main__':
                     # Add new member to list of chatroom members
                     roomIndex = getRoomByName(chatrooms, roomName)
                     chatroom = chatrooms[roomIndex]
-                    chatroom['Members'].append(str(joinId))
+                    member_object = {
+                        'JoinId': str(joinId),
+                        'Name': details[3],
+                        'IP': addr[0],
+                        'Port': addr[1]
+                    }
+                    chatroom['Members'].append(member_object)
                     chatrooms[roomIndex] = chatroom
 
                     # Add client to clients list
